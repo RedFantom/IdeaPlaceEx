@@ -5,8 +5,7 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(PROJECT_NAME "IdeaPlaceEx")
 project(${PROJECT_NAME})
 
-find_package (PkgConfig)
-
+find_package (PkgConfig REQUIRED)
 #The project version number
 set(VERSION_MAJOR   0   CACHE STRING "Project major version number.")
 set(VERSION_MINOR   2   CACHE STRING "Project minor version number.")
@@ -29,40 +28,12 @@ unset(CMAKE_INSTALL_PREFIX)
 message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
 
 # Find the directory for LIMBO. If cache variable LIMBO_DIR is defined, use it as the path to LIMBO, otherwise use the system LIMBO_DIR
-if (LIMBO_DIR)
-    set(LIMBO_ROOT_DIR ${LIMBO_DIR})
-    message(STATUS "Use LIMBO: ${LIMBO_ROOT_DIR}")
-else()
-    set(LIMBO_ROOT_DIR $ENV{LIMBO_DIR})
-    message(STATUS "Use system LIMBO ${LIMBO_ROOT_DIR}")
-endif()
+SET(LIMBO_ROOT_DIR "../limbo/limbo")
+include_directories(${LIMBO_ROOT_DIR}/..)
 unset (LIMBO_DIR CACHE)
 
 find_package(Boost 1.6 COMPONENTS system graph iostreams)
 find_package( ZLIB REQUIRED )
-
-
-
-# Find Lemon
-if (LEMON_DIR)
-  set(LEMON_ROOT_DIR ${LEMON_DIR})
-else()
-  set(LEMON_ROOT_DIR $ENV{LEMON_DIR})
-endif()
-message(STATUS "Find Lemon: ${LEMON_ROOT_DIR}")
-unset(LEMON_DIR CACHE)
-
-
-
-# Find Eigen
-if (EIGEN_DIR)
-    set(EIGEN_ROOT_DIR ${EIGEN_DIR})
-else()
-    set(EIGEN_ROOT_DIR $ENV{EIGEN_INC})
-endif()
-message(STATUS "Find Eigen: ${EIGEN_ROOT_DIR}")
-unset(LEMON_DIR CACHE)
-
 
 # Find the directory for LPSOLVE. If cache variable LPSOLVE_DIR is defined, use it as the path to LPSOLVE, otherwise use the system LPSOLVE_DIR
 if (LPSOLVE_DIR)
@@ -131,24 +102,37 @@ file(GLOB EXE_SOURCES src/main/main.cpp)
 file(GLOB PY_API_SOURCES src/api/*.cpp)
 
 # linking libraries
-file(GLOB STATIC_LIB 
-    ${LIMBO_ROOT_DIR}/lib/libgdsdb.a 
-    ${LIMBO_ROOT_DIR}/lib/libgdsparser.a)
+file(GLOB STATIC_LIB
+    ${LIMBO_ROOT_DIR}/parsers/gdsii/gdsdb/libgdsdb.a
+    ${LIMBO_ROOT_DIR}/parsers/gdsii/stream/libgdsparser.a
+    ${LIMBO_ROOT_DIR}/thirdparty/gzstream/libgzstream.a)
 
-#pybind11
-if (PYBIND11_DIR)
-    set(PYBIND11_ROOT_DIR ${PYBIND11_DIR})
-    message(STATUS "Use pybind11: ${PYBIND11_ROOT_DIR}")
-else()
-    set(PYBIND11_ROOT_DIR $ENV{PYBIND11_DIR})
-    message(STATUS "Use system pybind11: ${PYBIND11_ROOT_DIR}")
-endif()
+include_directories(".")
+
+# Pybind11
+find_package(pybind11 REQUIRED )
+include_directories(${PYBIND11_INCLUDE_DIRS})
+link_libraries(${PYBIND11_LIBS})
 unset(PYBIND11_DIR CACHE)
-add_subdirectory(${PYBIND11_ROOT_DIR} "./pybind11")
 
 # Python
-find_package(PythonLibs REQUIRED)
+pkg_check_modules(PYTHON REQUIRED python2=2.7)
+include_directories(${PYTHON_INCLUDE_DIRS})
+link_libraries(${PYTHON_LIBRARIES})
+message(STATUS "Found Python2: " ${PYTHON_FOUND})
 
+# Lemon
+pkg_check_modules(LEMON REQUIRED lemon)
+include_directories(${LEMON_INCLUDE_DIRS})
+link_libraries(lemon)
+message(STATUS "Found Lemon: " ${LEMON_FOUND})
+message(STATUS "Lemon libraries: " ${LEMON_LIBRARIES})
+
+# Eigen
+pkg_check_modules(EIGEN REQUIRED eigen3)
+include_directories(${EIGEN_INCLUDE_DIRS})
+link_libraries(${EIGEN_LIBRARIES})
+message(STATUS "Found eigen: " ${EIGEN_FOUND})
 
 #Gurobi
 if (GUROBI_HOME)
@@ -183,6 +167,7 @@ else()
 endif()
 
 #wnlib: conjugate gradient for reference
+set (WNLIB_DIR ../wnlib )
 if (WNLIB_DIR)
     set(WNLIB_ROOT_DIR ${WNLIB_DIR})
     message(STATUS "Use wnlib ${WNLIB_ROOT_DIR}")
@@ -197,14 +182,10 @@ else()
 endif()
 unset(WNLIB_DIR CACHE)
 
-if (USE_WNLIB)
-    find_library(WNLIB_LIBRARIES
-        NAMES text.a
-        HINTS ${WNLIB_ROOT_DIR}/acc
-        )
-endif()
-
-
+find_library(WNLIB_LIBRARIES
+    NAMES text.a
+    HINTS ${WNLIB_ROOT_DIR}/acc
+    )
 
 #Print out the used build type
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -252,13 +233,17 @@ if (USE_GUROBI)
 endif()
 
 if (USE_WNLIB)
-    set(TO_LINK_LIBS ${TO_LINK_LIBS} ${WNLIB_LIBRARIES})
-    set(TO_INCLUDE_PATH ${TO_INCLUDE_PATH} ${WNLIB_ROOT_DIR}/acc/h)
+    link_libraries(${WNLIB_LIBRARIES})
+    include_directories(${WNLIB_ROOT_DIR}/acc/h)
 endif()
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${EXE_SOURCES})
 
 include_directories(${TO_INCLUDE_PATH})
+include_directories( "." )
+pkg_check_modules( EIGEN REQUIRED eigen3 )
+link_libraries(${EIGEN_LIBRARIES})
+include_directories(${EIGEN_INCLUDE_DIRS})
 
 
 target_link_libraries(${PROJECT_NAME} 
